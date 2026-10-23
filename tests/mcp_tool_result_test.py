@@ -92,8 +92,10 @@ class MCPStructuredResultTest(IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_existing_text_content_is_preserved(self) -> None:
-        """Existing text is preserved without appending structured JSON."""
+    async def test_text_summary_and_structured_content_are_both_kept(
+        self,
+    ) -> None:
+        """A summary text and the structured payload both reach the model."""
         chunk = await _tool(
             mcp.types.CallToolResult(
                 content=[
@@ -114,12 +116,39 @@ class MCPStructuredResultTest(IsolatedAsyncioTestCase):
                         "created_at": AnyString(),
                         "finished_at": None,
                     },
+                    {
+                        "type": "text",
+                        "text": '{"city": "Paris", "temperature_c": 21.5}',
+                        "id": AnyString(),
+                        "created_at": AnyString(),
+                        "finished_at": None,
+                    },
                 ],
                 "state": "running",
                 "is_last": True,
                 "metadata": {},
                 "id": AnyString(),
             },
+        )
+
+    async def test_identical_serialized_text_is_not_duplicated(self) -> None:
+        """A text block that already holds the JSON is not appended twice."""
+        chunk = await _tool(
+            mcp.types.CallToolResult(
+                content=[
+                    mcp.types.TextContent(
+                        type="text",
+                        text='{"city": "Paris", "temperature_c": 21.5}',
+                    ),
+                ],
+                structured_content={"city": "Paris", "temperature_c": 21.5},
+            ),
+        ).call(city="Paris")
+
+        self.assertEqual(len(chunk.content), 1)
+        self.assertEqual(
+            chunk.model_dump()["content"][0]["text"],
+            '{"city": "Paris", "temperature_c": 21.5}',
         )
 
     async def test_structured_result_is_kept_next_to_media(self) -> None:

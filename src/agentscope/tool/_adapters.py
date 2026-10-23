@@ -350,19 +350,19 @@ class MCPTool(ToolBase):
         # Convert MCP result to AgentScope blocks
         content = self._convert_mcp_content_to_blocks(result.content)
 
-        # Fall back to structured JSON when no text block is available.
-        # Preserve existing text content without appending JSON.
-        if result.structured_content is not None and not any(
-            isinstance(block, TextBlock) for block in content
-        ):
-            content.append(
-                TextBlock(
-                    text=json.dumps(
-                        result.structured_content,
-                        ensure_ascii=False,
-                    ),
-                ),
+        # Keep the structured payload even when the server also sent a text
+        # summary: the summary does not carry the JSON. Skip the append only
+        # when a text block already holds the identical serialization.
+        if result.structured_content is not None:
+            structured_text = json.dumps(
+                result.structured_content,
+                ensure_ascii=False,
             )
+            if not any(
+                isinstance(block, TextBlock) and block.text == structured_text
+                for block in content
+            ):
+                content.append(TextBlock(text=structured_text))
 
         return ToolChunk(
             content=content,
